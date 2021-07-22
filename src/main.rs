@@ -1,4 +1,4 @@
-use nannou::{color, math::cgmath::Vector2, prelude::*};
+use nannou::{color, geom::Vector2, prelude::*};
 use std::time::Duration;
 
 const WIDTH_COUNT: usize = 100;
@@ -7,9 +7,9 @@ const GRID_SQUARE_WIDTH: f32 = TOTAL_WIDTH/WIDTH_COUNT as f32;
 
 struct Model {
     grid: [bool; WIDTH_COUNT*WIDTH_COUNT],
-    mouse_pos: Vector2<f32>,
     time_since_last_tick: std::time::Duration,
     paused: bool,
+    last_clicked_index: Option<usize>,
 }
 
 fn main() {
@@ -26,9 +26,9 @@ fn model(app: &App) -> Model {
 
     Model {
         grid: [false; WIDTH_COUNT*WIDTH_COUNT],
-        mouse_pos: Vector2 {x: 0., y: 0.},
         time_since_last_tick: Duration::new(0, 0),
         paused: true,
+        last_clicked_index: None,
     }
 }
 
@@ -40,19 +40,33 @@ fn update(_app: &App, model: &mut Model, update: Update) {
     }
 }
 
-fn event(_app: &App, model: &mut Model, event: WindowEvent) {
+fn event(app: &App, model: &mut Model, event: WindowEvent) {
     match event {
-        WindowEvent::MouseMoved(pos) => {
-            model.mouse_pos = Vector2 {x: pos.x, y: pos.y};
+        WindowEvent::MouseMoved(_) => {
+            if !app.mouse.buttons.left().is_down() {
+                return;
+            }
+            let mouse_pos = app.mouse.position();
+            let curr_index = pos_to_index(mouse_pos, GRID_SQUARE_WIDTH, WIDTH_COUNT);
+            if let Some(index) = curr_index {
+                if let Some(last) = model.last_clicked_index {
+                    if last != index {
+                        model.grid[index] = !model.grid[index];
+                        model.last_clicked_index = Some(index);
+                    }
+                }
+            }
         },
         WindowEvent::MousePressed(_) => {
-            let clicked_index = pos_to_index(model.mouse_pos, GRID_SQUARE_WIDTH, WIDTH_COUNT);
+            let mouse_pos = app.mouse.position();
+            let clicked_index = pos_to_index(mouse_pos, GRID_SQUARE_WIDTH, WIDTH_COUNT);
             match clicked_index {
                 Some(index) => {
                     // println!("{}", index);
                     // println!("Pos: {:?}", model.mouse_pos);
                     // println!("{} has {} alive neighbours.", index, cell_neighbours(index).iter().filter(|i| model.grid[**i]).count());
                     model.grid[index] = !model.grid[index];
+                    model.last_clicked_index = Some(index);
                 },
                 None => {},
             }
@@ -60,6 +74,7 @@ fn event(_app: &App, model: &mut Model, event: WindowEvent) {
         WindowEvent::KeyPressed(key) => {
             match key {
                 Key::P => {model.paused = !model.paused},
+                Key::R => {model.grid = [false; WIDTH_COUNT*WIDTH_COUNT]}
                 _ => {},
             }
         }
